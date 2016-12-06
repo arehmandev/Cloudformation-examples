@@ -5,9 +5,13 @@ This repo contains some Cloudformation examples (in JSON).
 Appdemo.json is the main one. It creates:
 
 VPC
+
 1 Public Subnet
+
 1 x t2 small Amazon Linux EC2 instance - private IP 10.0.0.10
+
 Elastic IP attached to EC2
+
 Cloud-init userdata bash script - installs polymer js application
 
 Instructions:
