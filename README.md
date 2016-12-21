@@ -7,9 +7,13 @@ Appdemo.json is the main one. It creates:
 VPC
 
 1 Public Subnet
+
 1 x ELB, laodbalancing 2 instances.
+
 2 x t2 small Amazon Linux EC2 instance
+
 Elastic IP attached to EC2
+
 Cloud-init userdata bash script - installs polymer js application on each instance
 
 Instructions:
