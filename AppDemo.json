@@ -13,10 +13,27 @@
       "ConstraintDescription" : "must be a valid EC2 instance type."
     },
 
+    "Gitbranch" : {
+      "Description" : "Github branch for webserver1 - by default this is master",
+      "Type" : "String",
+      "Default" : "master",
+      "AllowedValues" : [ "master", "development", "test", "staging"],
+      "ConstraintDescription" : "must be a valid EC2 instance type."
+    },
+
+    "Gitbranch2" : {
+      "Description" : "Github branch for webserver2 - by default this is master",
+      "Type" : "String",
+      "Default" : "master",
+      "AllowedValues" : [ "master", "development", "test", "staging"],
+      "ConstraintDescription" : "must be a valid EC2 instance type."
+    },
+
+
     "KeyName": {
       "Description" : "Name of an existing EC2 KeyPair to enable SSH access to the instance",
       "Type": "AWS::EC2::KeyPair::KeyName",
-      "Default" : "demokey",
+      "Default" : "ultimate-demo",
       "ConstraintDescription" : "must be the name of an existing EC2 KeyPair."
     },
 
@@ -341,6 +358,16 @@
       }
     },
 
+    "IPAddress" : {
+      "Type" : "AWS::EC2::EIP",
+      "DependsOn" : "AttachGateway",
+      "Properties" : {
+        "Domain" : "vpc",
+        "InstanceId" : { "Ref" : "WebServerInstance2" }
+      }
+    },
+
+
     "InstanceSecurityGroup" : {
       "Type" : "AWS::EC2::SecurityGroup",
       "Properties" : {
@@ -353,6 +380,37 @@
       }
     },
 
+    "PublicLoadBalancerSecurityGroup" : {
+      "Type" : "AWS::EC2::SecurityGroup",
+      "Properties" : {
+        "GroupDescription" : "Enable HTTP/HTTPS access on port 80/443 to 80/8080",
+        "VpcId" : { "Ref" : "VPC" },
+        "SecurityGroupIngress" : [ {
+          "IpProtocol" : "tcp",
+          "FromPort" : "80",
+          "ToPort" : "80",
+          "CidrIp" : "0.0.0.0/0"
+        },
+        {
+          "IpProtocol" : "tcp",
+          "FromPort" : "443",
+          "ToPort" : "443",
+          "CidrIp" : "0.0.0.0/0"
+        } ],
+        "SecurityGroupEgress" : [ {
+          "IpProtocol" : "tcp",
+          "FromPort" : "80",
+          "ToPort" : "80",
+          "CidrIp" : "0.0.0.0/0"
+        },
+        {
+          "IpProtocol" : "tcp",
+          "FromPort" : "8080",
+          "ToPort" : "8080",
+          "CidrIp" : "0.0.0.0/0"
+        } ]
+      }
+    },
 
     "WebServerInstance" : {
       "Type" : "AWS::EC2::Instance",
@@ -429,7 +487,7 @@
              "#!/bin/bash -xe\n",
              "yum update -y aws-cfn-bootstrap\n",
              "yum install -y git\n",
-             "git clone https://github.com/arehmandev/polymerjs-shopexample /home/ec2-user/app\n",
+             "git clone -b ", { "Ref" : "Gitbranch" }, " https://github.com/tariqahmed-ultima/ultima-shop-demo /home/ec2-user/app\n",
              "cd /home/ec2-user/app && bash VMbootstrap.sh\n",
              "/opt/aws/bin/cfn-init -v ",
              "         --stack ", { "Ref" : "AWS::StackName" },
@@ -450,13 +508,150 @@
           "Timeout" : "PT15M"
         }
       }
+    },
+    "WebServerInstance2" : {
+      "Type" : "AWS::EC2::Instance",
+      "DependsOn" : "AttachGateway",
+      "Metadata" : {
+        "Comment" : "Install a simple application",
+        "AWS::CloudFormation::Init" : {
+          "config" : {
+            "packages" : {
+              "yum" : {
+                "httpd"             : []
+              }
+            },
+
+            "files" : {
+              "/etc/cfn/cfn-hup.conf" : {
+                "content" : { "Fn::Join" : ["", [
+                  "[main]\n",
+                  "stack=", { "Ref" : "AWS::StackId" }, "\n",
+                  "region=", { "Ref" : "AWS::Region" }, "\n"
+                ]]},
+                "mode"    : "000400",
+                "owner"   : "root",
+                "group"   : "root"
+              },
+
+              "/etc/cfn/hooks.d/cfn-auto-reloader.conf" : {
+                "content": { "Fn::Join" : ["", [
+                  "[cfn-auto-reloader-hook]\n",
+                  "triggers=post.update\n",
+                  "path=Resources.WebServerInstance2.Metadata.AWS::CloudFormation::Init\n",
+                  "action=/opt/aws/bin/cfn-init -v ",
+                  "         --stack ", { "Ref" : "AWS::StackName" },
+                  "         --resource WebServerInstance2 ",
+                  "         --region ", { "Ref" : "AWS::Region" }, "\n",
+                  "runas=root\n"
+                ]]}
+              }
+            },
+
+            "services" : {
+              "sysvinit" : {
+                "cfn-hup" : { "enabled" : "true", "ensureRunning" : "true",
+                              "files" : ["/etc/cfn/cfn-hup.conf", "/etc/cfn/hooks.d/cfn-auto-reloader.conf"]}
+              }
+            }
+          }
+        }
+      },
+      "Properties" : {
+        "ImageId" : { "Fn::FindInMap" : [ "AWSRegionArch2AMI", { "Ref" : "AWS::Region" },
+                          { "Fn::FindInMap" : [ "AWSInstanceType2Arch", { "Ref" : "InstanceType" }, "Arch" ] } ] },
+        "InstanceType" : { "Ref" : "InstanceType" },
+        "KeyName" : { "Ref" : "KeyName" },
+        "Tags" : [
+            {
+                "Key" : "Name",
+                "Value" : "UltimaDemo"
+            },
+            {
+                "Key" : "Application",
+                "Value" : { "Ref" : "AWS::StackId" }
+            },
+       ],
+        "NetworkInterfaces" : [{
+          "GroupSet"                 : [{ "Ref" : "InstanceSecurityGroup" }],
+          "AssociatePublicIpAddress" : "true",
+          "DeviceIndex"              : "0",
+          "DeleteOnTermination"      : "true",
+          "PrivateIpAddress"         : "10.0.0.11",
+          "SubnetId"                 : { "Ref" : "Subnet" }
+        }],
+        "UserData"       : { "Fn::Base64" : { "Fn::Join" : ["", [
+             "#!/bin/bash -xe\n",
+             "yum update -y aws-cfn-bootstrap\n",
+             "yum install -y git\n",
+             "git clone -b ", { "Ref" : "Gitbranch2" }, " https://github.com/tariqahmed-ultima/ultima-shop-demo /home/ec2-user/app\n",
+             "cd /home/ec2-user/app && bash VMbootstrap.sh\n",
+             "/opt/aws/bin/cfn-init -v ",
+             "         --stack ", { "Ref" : "AWS::StackName" },
+             "         --resource WebServerInstance2 ",
+             "         --region ", { "Ref" : "AWS::Region" }, "\n",
+
+             "/opt/aws/bin/cfn-signal -e $? ",
+             "         --stack ", { "Ref" : "AWS::StackName" },
+             "         --resource WebServerInstance2 ",
+             "         --region ", { "Ref" : "AWS::Region" }, "\n",
+
+             "cd /home/ec2-user/app/shop\n",
+             "polymer serve --hostname 0.0.0.0 --port 80\n"
+        ]]}}
+      },
+      "CreationPolicy" : {
+        "ResourceSignal" : {
+          "Timeout" : "PT15M"
+        }
+      }
+    },
+
+    "UltimaLB1": {
+      "Type": "AWS::ElasticLoadBalancing::LoadBalancer",
+      "Properties": {
+         "HealthCheck": {
+           "HealthyThreshold": "2",
+           "Interval": "5",
+           "Target": "HTTP:80/",
+           "Timeout": "3",
+           "UnhealthyThreshold": "2"
+         },
+         "Listeners": [{
+             "InstancePort": "80",
+             "InstanceProtocol": "HTTP",
+             "LoadBalancerPort": "80",
+             "Protocol": "HTTP"
+         }],
+         "Scheme": "internet-facing",
+         "Subnets": [ { "Ref": "Subnet" } ],
+         "SecurityGroups": [ { "Ref": "PublicLoadBalancerSecurityGroup" } ],
+         "Instances": [
+           { "Ref": "WebServerInstance" },
+           { "Ref": "WebServerInstance2" }
+         ],
+         "Tags": [ { "Key": "resclass", "Value": "vcts-lab-elb" } ]
+      }
     }
-  },
+
+
+},
+
+
+
 
   "Outputs" : {
-    "URL" : {
+    "WebURL" : {
       "Value" : { "Fn::Join" : [ "", ["http://", { "Fn::GetAtt" : ["WebServerInstance", "PublicIp"] }]]},
       "Description" : "Newly created application URL"
+    },
+    "WebURL2" : {
+      "Value" : { "Fn::Join" : [ "", ["http://", { "Fn::GetAtt" : ["WebServerInstance2", "PublicIp"] }]]},
+      "Description" : "Newly created application URL"
+    },
+    "ELBDNSName": {
+      "Description": "DNS host for the ELB",
+      "Value": { "Fn::GetAtt": [ "UltimaLB1", "DNSName" ] }
     }
-  }
+  },
 }
