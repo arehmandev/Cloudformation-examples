@@ -20,4 +20,4 @@ Instructions:
 ```
 1.Use AWS Cloudformation to load the template
 2. (By default the name of the EC2 key is demokey, ensure you have a key called demokey)
-3. Wait for template to finish, browse to IP of EC2 to see application
+3. Wait for template to finish, browse to DNS name of ELB to see round-robin loadbalancing of application servers
