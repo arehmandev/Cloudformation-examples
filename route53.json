@@ -2,20 +2,25 @@
   "AWSTemplateFormatVersion": "2010-09-09",
   "Description": "Create a Route53 record",
   "Resources": {
+    "MyHostedZone": {
+      "Type": "AWS::Route53::HostedZone",
+      "Properties": {
+        "Name": "abdul.com."
+      }
+    },
     "myDNSRecords": {
+      "DependsOn": "MyHostedZone",
       "Type": "AWS::Route53::RecordSetGroup",
       "Properties": {
-        "HostedZoneName": "example.com.",
-        "Comment": "Weighted RR for my frontends.",
+        "HostedZoneName": "abdul.com.",
+        "Comment": "CNAME record.",
         "RecordSets": [
           {
-            "Name": "mycname.example.com.",
+            "Name": "mycname.abdul.com",
             "Type": "CNAME",
             "TTL": "900",
-            "SetIdentifier": "Frontend One",
-            "Weight": "4",
             "ResourceRecords": [
-              "abdul.example.com"
+              "abdul.abdul.com"
             ]
           }
         ]
