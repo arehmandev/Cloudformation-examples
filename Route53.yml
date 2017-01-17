@@ -5,7 +5,6 @@ Resources:
     Type: 'AWS::Route53::HostedZone'
     Properties:
       Name: abdul.com.
-
   myDNSRecords:
     DependsOn: MyHostedZone
     Type: 'AWS::Route53::RecordSetGroup'
@@ -18,3 +17,15 @@ Resources:
           TTL: '900'
           ResourceRecords:
             - abdul.abdul.com
+  myDNSRecords2:
+    DependsOn: MyHostedZone
+    Type: 'AWS::Route53::RecordSetGroup'
+    Properties:
+      HostedZoneName: abdul.com.
+      Comment: A record.
+      RecordSets:
+        - Name: abdul.abdul.com
+          Type: A
+          TTL: '900'
+          ResourceRecords:
+            - 192.168.0.4
