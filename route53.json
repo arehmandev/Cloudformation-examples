@@ -1,0 +1,25 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "Create a Route53 record",
+  "Resources": {
+    "myDNSRecords": {
+      "Type": "AWS::Route53::RecordSetGroup",
+      "Properties": {
+        "HostedZoneName": "example.com.",
+        "Comment": "Weighted RR for my frontends.",
+        "RecordSets": [
+          {
+            "Name": "mycname.example.com.",
+            "Type": "CNAME",
+            "TTL": "900",
+            "SetIdentifier": "Frontend One",
+            "Weight": "4",
+            "ResourceRecords": [
+              "abdul.example.com"
+            ]
+          }
+        ]
+      }
+    }
+  }
+}
