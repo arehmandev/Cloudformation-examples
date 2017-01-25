@@ -4,7 +4,7 @@ Parameters:
   InstanceType:
     Description: WebServer EC2 instance type
     Type: String
-    Default: t2.small
+    Default: t2.micro
     AllowedValues:
       - t1.micro
       - t2.nano
@@ -14,52 +14,6 @@ Parameters:
       - t2.large
       - m1.small
       - m1.medium
-      - m1.large
-      - m1.xlarge
-      - m2.xlarge
-      - m2.2xlarge
-      - m2.4xlarge
-      - m3.medium
-      - m3.large
-      - m3.xlarge
-      - m3.2xlarge
-      - m4.large
-      - m4.xlarge
-      - m4.2xlarge
-      - m4.4xlarge
-      - m4.10xlarge
-      - c1.medium
-      - c1.xlarge
-      - c3.large
-      - c3.xlarge
-      - c3.2xlarge
-      - c3.4xlarge
-      - c3.8xlarge
-      - c4.large
-      - c4.xlarge
-      - c4.2xlarge
-      - c4.4xlarge
-      - c4.8xlarge
-      - g2.2xlarge
-      - g2.8xlarge
-      - r3.large
-      - r3.xlarge
-      - r3.2xlarge
-      - r3.4xlarge
-      - r3.8xlarge
-      - i2.xlarge
-      - i2.2xlarge
-      - i2.4xlarge
-      - i2.8xlarge
-      - d2.xlarge
-      - d2.2xlarge
-      - d2.4xlarge
-      - d2.8xlarge
-      - hi1.4xlarge
-      - hs1.8xlarge
-      - cr1.8xlarge
-      - cc2.8xlarge
-      - cg1.4xlarge
     ConstraintDescription: must be a valid EC2 instance type.
   Gitbranch:
     Description: Github branch for webserver1 - by default this is master
@@ -84,7 +38,7 @@ Parameters:
   KeyName:
     Description: Name of an existing EC2 KeyPair to enable SSH access to the instance
     Type: 'AWS::EC2::KeyPair::KeyName'
-    Default: demokey
+    Default: ultimate-demo
     ConstraintDescription: must be the name of an existing EC2 KeyPair.
   SSHLocation:
     Description: ' The IP address range that can be used to SSH to the EC2 instances'
@@ -404,6 +358,13 @@ Resources:
         - Key: Application
           Value:
             Ref: 'AWS::StackId'
+
+  InstanceProfile:
+            Type: "AWS::IAM::InstanceProfile"
+            Properties:
+              Path: "/"
+              Roles:
+                - "CodeDeploy-UltimaDemo"
   Subnet:
     Type: 'AWS::EC2::Subnet'
     Properties:
@@ -547,7 +508,14 @@ Resources:
         Ref: Subnet
       NetworkAclId:
         Ref: NetworkAcl
-  IPAddress:
+  IPAddress1:
+    Type: 'AWS::EC2::EIP'
+    DependsOn: AttachGateway
+    Properties:
+      Domain: vpc
+      InstanceId:
+        Ref: WebServerInstance
+  IPAddress2:
     Type: 'AWS::EC2::EIP'
     DependsOn: AttachGateway
     Properties:
@@ -590,10 +558,7 @@ Resources:
           FromPort: '80'
           ToPort: '80'
           CidrIp: 0.0.0.0/0
-        - IpProtocol: tcp
-          FromPort: '8080'
-          ToPort: '8080'
-          CidrIp: 0.0.0.0/0
+
   WebServerInstance:
     Type: 'AWS::EC2::Instance'
     DependsOn: AttachGateway
@@ -665,10 +630,12 @@ Resources:
         Ref: KeyName
       Tags:
         - Key: Name
-          Value: UltimaDemo
+          Value: UltimaDemo1
         - Key: Application
           Value:
             Ref: 'AWS::StackId'
+      IamInstanceProfile:
+          Ref: InstanceProfile
       NetworkInterfaces:
         - GroupSet:
             - Ref: InstanceSecurityGroup
@@ -688,12 +655,12 @@ Resources:
                 yum update -y aws-cfn-bootstrap
               - |
                 yum install -y git
+              - |
+                yum install -y httpd
               - 'git clone -b '
               - Ref: Gitbranch
               - |2
-                 https://github.com/tariqahmed-ultima/ultima-shop-demo /home/ec2-user/app
-              - |
-                cd /home/ec2-user/app && bash VMbootstrap.sh
+                 https://github.com/tariqahmed-ultima/ultima-demo /var/www/html
               - '/opt/aws/bin/cfn-init -v '
               - '         --stack '
               - Ref: 'AWS::StackName'
@@ -711,9 +678,9 @@ Resources:
               - |+
 
               - |
-                cd /home/ec2-user/app/shop
+                service httpd start
               - |
-                polymer serve --hostname 0.0.0.0 --port 80
+                chkconfig httpd on
     CreationPolicy:
       ResourceSignal:
         Timeout: PT15M
@@ -788,10 +755,12 @@ Resources:
         Ref: KeyName
       Tags:
         - Key: Name
-          Value: UltimaDemo
+          Value: UltimaDemo2
         - Key: Application
           Value:
             Ref: 'AWS::StackId'
+      IamInstanceProfile:
+        Ref: InstanceProfile
       NetworkInterfaces:
         - GroupSet:
             - Ref: InstanceSecurityGroup
@@ -811,12 +780,12 @@ Resources:
                 yum update -y aws-cfn-bootstrap
               - |
                 yum install -y git
-              - 'git clone -b '
-              - Ref: Gitbranch2
-              - |2
-                 https://github.com/tariqahmed-ultima/ultima-shop-demo /home/ec2-user/app
               - |
-                cd /home/ec2-user/app && bash VMbootstrap.sh
+                yum install -y httpd
+              - 'git clone -b '
+              - Ref: Gitbranch
+              - |2
+                 https://github.com/tariqahmed-ultima/ultima-demo /var/www/html
               - '/opt/aws/bin/cfn-init -v '
               - '         --stack '
               - Ref: 'AWS::StackName'
@@ -834,19 +803,22 @@ Resources:
               - |+
 
               - |
-                cd /home/ec2-user/app/shop
+                service httpd start
               - |
-                polymer serve --hostname 0.0.0.0 --port 80
+                chkconfig httpd on
     CreationPolicy:
       ResourceSignal:
         Timeout: PT15M
   UltimaLB1:
     Type: 'AWS::ElasticLoadBalancing::LoadBalancer'
+    DependsOn:
+      - WebServerInstance2
+      - WebServerInstance
     Properties:
       HealthCheck:
         HealthyThreshold: '2'
         Interval: '5'
-        Target: 'HTTP:80/'
+        Target: 'HTTP:80/index.html'
         Timeout: '3'
         UnhealthyThreshold: '2'
       Listeners:
@@ -865,6 +837,66 @@ Resources:
       Tags:
         - Key: resclass
           Value: vcts-lab-elb
+  UltimaDNS:
+    Type: 'AWS::Route53::RecordSetGroup'
+    DependsOn: UltimaLB1
+    Properties:
+      HostedZoneName: ultima-devops.com.
+      Comment: Zone apex alias targeted to  UltimaLB1 LoadBalancer.
+      RecordSets:
+      - Name:
+            'Fn::Join':
+              - ''
+              -  - Ref: Gitbranch
+                 - .ultima-devops.com.
+        Type: A
+        AliasTarget:
+          HostedZoneId:
+            'Fn::GetAtt':
+              - UltimaLB1
+              - CanonicalHostedZoneNameID
+          DNSName:
+           'Fn::GetAtt':
+            - UltimaLB1
+            - DNSName
+  DNSNameweb:
+   Type: 'AWS::Route53::RecordSetGroup'
+   DependsOn: IPAddress1
+   Properties:
+     HostedZoneName: ultima-devops.com.
+     Comment: A record.
+     RecordSets:
+       - Name:
+           'Fn::Join':
+             - ''
+             -  - web
+                - Ref: Gitbranch
+                - .ultima-devops.com.
+         Type: A
+         TTL: '900'
+         ResourceRecords:
+           - 'Fn::GetAtt':
+             - WebServerInstance
+             - PublicIp
+  DNSNameweb2:
+   Type: 'AWS::Route53::RecordSetGroup'
+   DependsOn: IPAddress2
+   Properties:
+     HostedZoneName: ultima-devops.com.
+     Comment: A record.
+     RecordSets:
+       - Name:
+           'Fn::Join':
+             - ''
+             -  - web2
+                - Ref: Gitbranch
+                - .ultima-devops.com.
+         Type: A
+         TTL: '900'
+         ResourceRecords:
+           - 'Fn::GetAtt':
+             - WebServerInstance2
+             - PublicIp
 Outputs:
   WebURL:
     Value:
